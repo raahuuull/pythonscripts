@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation template to launch two free-tier EC2 instances, one Ubuntu and one Amazon Linux, with SSM pre-installed.
+
+Resources:
+  # Ubuntu EC2 instance
+  UbuntuInstance:
+    Type: "AWS::EC2::Instance"
+    Properties: 
+      InstanceType: "t2.micro"
+      ImageId: !Ref UbuntuAMI
+      KeyName: !Ref MyKeyPair
+      IamInstanceProfile: !Ref SSMInstanceProfile
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: UbuntuInstance
+
+  # Amazon Linux EC2 instance
+  AmazonLinuxInstance:
+    Type: "AWS::EC2::Instance"
+    Properties: 
+      InstanceType: "t2.micro"
+      ImageId: !Ref AmazonLinuxAMI
+      KeyName: !Ref MyKeyPair
+      IamInstanceProfile: !Ref SSMInstanceProfile
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: AmazonLinuxInstance
+
+  # Security Group for instances
+  InstanceSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Enable SSH access"
+      SecurityGroupIngress:
+        - IpProtocol: "tcp"
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+
+  # IAM Role for SSM access
+  SSMInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Roles:
+        - !Ref SSMRole
+
+  SSMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: "SSMManagedPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ssm:DescribeInstanceInformation"
+                  - "ssm:GetCommandInvocation"
+                  - "ssm:ListCommandInvocations"
+                  - "ssm:SendCommand"
+                Resource: "*"
+        - PolicyName: "EC2SSMAccess"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ec2:DescribeInstances"
+                Resource: "*"
+
+  # Latest Ubuntu AMI
+  UbuntuAMI:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+
+  # Latest Amazon Linux 2 AMI
+  AmazonLinuxAMI:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+
+  # Create a new Key Pair named MyKeyPair
+  MyKeyPair:
+    Type: "AWS::EC2::KeyPair"
+    Properties:
+      KeyName: "MyKeyPair"
+
+Outputs:
+  UbuntuInstanceId:
+    Description: "Ubuntu EC2 Instance ID"
+    Value: !Ref UbuntuInstance
+
+  AmazonLinuxInstanceId:
+    Description: "Amazon Linux EC2 Instance ID"
+    Value: !Ref AmazonLinuxInstance
+
+  KeyPairName:
+    Description: "Name of the EC2 KeyPair"
+    Value: !Ref MyKeyPair
